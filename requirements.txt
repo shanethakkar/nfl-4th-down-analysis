@@ -1,0 +1,9 @@
+# Core stack for notebooks/01_eda.ipynb and data pipeline.
+# Install (recommended on Windows): python -m pip install -r requirements.txt
+pandas
+numpy
+matplotlib
+seaborn
+pyarrow
+requests
+jupyter

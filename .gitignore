@@ -1,0 +1,32 @@
+# ── Raw & processed data (large files, re-downloadable) ───────────────────────
+data/
+
+# ── Generated figures (reproducible from notebooks) ───────────────────────────
+outputs/figures/
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── Jupyter checkpoints ───────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# ── Anaconda project metadata ─────────────────────────────────────────────────
+anaconda_projects/
+
+# ── ML models (large binaries, regenerate with 08_ml_model.ipynb) ─────────────
+models/
+*.pkl
+*.joblib
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+*.env
+conda-spec-file.txt
+
+# ── OS noise ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

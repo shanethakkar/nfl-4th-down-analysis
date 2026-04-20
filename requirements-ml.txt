@@ -1,0 +1,6 @@
+# Modeling stack for later notebooks (install after requirements.txt).
+# python -m pip install -r requirements-ml.txt
+-r requirements.txt
+xgboost
+optuna
+shap
