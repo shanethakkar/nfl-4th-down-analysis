@@ -16,10 +16,11 @@ __pycache__/
 # ── Anaconda project metadata ─────────────────────────────────────────────────
 anaconda_projects/
 
-# ── ML models (large binaries, regenerate with 08_ml_model.ipynb) ─────────────
-models/
-*.pkl
-*.joblib
+# ── ML models ─────────────────────────────────────────────────────────────────
+# Trained XGBoost models (~2MB total) ARE tracked so Streamlit Cloud can load them.
+# Only ignore stray pickles outside the models/ folder.
+/*.pkl
+/*.joblib
 
 # ── Environment & secrets ─────────────────────────────────────────────────────
 .env

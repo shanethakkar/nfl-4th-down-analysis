@@ -3,6 +3,7 @@
 Look up the historically optimal call for any 4th down situation.
 """
 
+import sys
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -15,8 +16,10 @@ st.set_page_config(
     layout="wide",
 )
 
-
 ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from model import apply_rules
 
 # ── Bin definitions (must match src/features.py exactly) ──────────────────────
 FIELD_BINS   = [0,  20,  40,  60,  80, 100]
@@ -223,6 +226,14 @@ else:
     wrong_rate   = np.nan
     actual_rates = {}
 
+# ── Rule-based override ───────────────────────────────────────────────────────
+# In extreme late-game situations the correct call is mathematically determined.
+# Override the bucket-based optimal when a domain rule fires.
+rule_forced = apply_rules(score_diff, seconds, yardline)
+rule_override = rule_forced is not None and rule_forced != optimal
+if rule_forced is not None:
+    optimal = rule_forced
+
 # ── Output ────────────────────────────────────────────────────────────────────
 st.subheader("Optimal Call")
 
@@ -232,6 +243,16 @@ if optimal is None:
         "Try adjusting the score differential or time remaining."
     )
 else:
+    # Show a rule override banner when domain logic overrides the model
+    if rule_override:
+        st.info(
+            "**★ Rule override applied** — In this late-game situation the optimal "
+            "call is mathematically forced by game logic (e.g. punting while trailing "
+            "with under 2 minutes is irrational regardless of field position). "
+            "The historical bucket data is shown for context.",
+            icon="⚡",
+        )
+
     opt_color  = DEC_COLORS[optimal]
     opt_label  = DEC_LABELS[optimal]
     opt_emoji  = DEC_EMOJI[optimal]

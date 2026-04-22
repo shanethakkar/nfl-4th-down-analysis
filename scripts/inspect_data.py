@@ -1,0 +1,15 @@
+import pandas as pd
+df = pd.read_parquet('data/fourth_downs_graded.parquet')
+print('Shape:', df.shape)
+print('Columns:', list(df.columns))
+print()
+key_cols = ['yardline_100','ydstogo','score_differential','game_seconds_remaining','season','wpa','decision','made_optimal','decision_gap']
+print(df[key_cols].describe())
+print()
+print('Decision counts:')
+print(df['decision'].value_counts())
+print()
+print('Null counts in key cols:')
+print(df[key_cols].isnull().sum())
+print()
+print('Season range:', df['season'].min(), '-', df['season'].max())
