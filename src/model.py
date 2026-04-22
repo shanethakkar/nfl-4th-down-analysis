@@ -49,7 +49,11 @@ from collections import Counter
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import joblib
+
+# joblib / xgboost are only required by load_models() and the grid-prediction
+# helpers. They are imported lazily so lightweight consumers (e.g. the
+# Decision Calculator, which only uses apply_rules) don't need the full ML
+# stack in their requirements.txt.
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 DECISIONS  = ["go_for_it", "punt", "field_goal"]
@@ -88,6 +92,8 @@ def load_models(model_dir: Path | None = None) -> dict:
         def get_models():
             return load_models()
     """
+    import joblib  # lazy — only required when actually loading models
+
     if model_dir is None:
         model_dir = _model_dir()
 
