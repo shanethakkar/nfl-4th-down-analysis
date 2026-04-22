@@ -122,15 +122,15 @@ The single most surprising finding came from Andy Reid. In 1999, his first NFL h
 
 And at the very top: the best single-season decision-quality mark in my entire dataset belongs to a head coach who had never held the job before. **Brian Schottenheimer**, in his rookie year as the Cowboys head coach in 2025, went for it on **29.5%** of fourth downs with an optimal-decision rate of **82%** across 105 qualifying decisions. Highest accuracy, nearly-highest aggression, zero prior head-coaching experience. It is one season — small sample, and he will have to prove it over time — but in 27 years of data, no rookie head coach has matched it.
 
-I built a **[Coach Explorer]([COACH_EXPLORER_URL])** that lets you sort and filter all 167 coaches by era, aggression, and decision quality. If you want to argue with the rankings, start there.
+I built a **[Coach Explorer](https://4th-down-coach-explorer.streamlit.app/)** that lets you sort and filter all 167 coaches by era, aggression, and decision quality. If you want to argue with the rankings, start there.
 
 ---
 
 ## Explore It Yourself
 
-The analysis above is built on historical averages, which is where it has to start. But fourth down is situational, and every game is different. I built a **[4th Down Decision Calculator]([CALCULATOR_APP_URL])** that takes any specific scenario — field position, yards to go, score, time remaining — and returns the historically optimal call alongside what real NFL coaches actually chose in that exact situation. If you want to start somewhere familiar, type in the Belichick scenario.
+The analysis above is built on historical averages, which is where it has to start. But fourth down is situational, and every game is different. I built a **[4th Down Decision Calculator](https://4th-down-calculator.streamlit.app/)** that takes any specific scenario — field position, yards to go, score, time remaining — and returns the historically optimal call alongside what real NFL coaches actually chose in that exact situation. If you want to start somewhere familiar, type in the Belichick scenario.
 
-The second tool, a **[Decision Boundary Map]([HEATMAP_APP_URL])** powered by an XGBoost model trained on all 107,000 plays, visualizes optimal calls across every field position and yards-to-go combination simultaneously, updating in real time as you move the game-state sliders.
+The second tool, a **[Decision Boundary Map](https://4th-down-heatmap.streamlit.app/)** powered by an XGBoost model trained on all 107,000 plays, visualizes optimal calls across every field position and yards-to-go combination simultaneously, updating in real time as you move the game-state sliders.
 
 ---
 
