@@ -9,6 +9,9 @@ import numpy as np
 import plotly.graph_objects as go
 from pathlib import Path
 
+from rapidfuzz import fuzz, process
+from streamlit_searchbox import st_searchbox
+
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="NFL Coach Explorer · 4th Down Analysis",
@@ -19,6 +22,50 @@ st.set_page_config(
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
+# Plotly colors synced to Streamlit light/dark when `st.context.theme` is available.
+_CHART_THEME = {
+    "light": {
+        "paper_bgcolor": "#ffffff",
+        "plot_bgcolor": "#FAFAFA",
+        "font_color": "#262730",
+        "grid_color": "#e6e9ef",
+        "median_line": "#B0BEC5",
+        "marker_line": "#ffffff",
+        "highlight_text": "#C5203B",
+    },
+    "dark": {
+        "paper_bgcolor": "#0e1117",
+        "plot_bgcolor": "#161b22",
+        "font_color": "#fafafa",
+        "grid_color": "#30363d",
+        "median_line": "#6e7681",
+        "marker_line": "#3d444d",
+        "highlight_text": "#ff7b72",
+    },
+}
+
+
+def _chart_theme_key() -> str:
+    """Return 'dark' or 'light' for chart styling. Uses ``st.context.theme`` (Streamlit >= 1.46)."""
+    try:
+        theme = getattr(st.context, "theme", None)
+        if theme is None:
+            return "light"
+        # 1.46+ exposes .type ("light" | "dark"); may also be a mapping with "type"
+        kind = None
+        if isinstance(theme, dict):
+            kind = theme.get("type")
+        if kind is None:
+            kind = getattr(theme, "type", None)
+        if kind is None:
+            kind = getattr(theme, "base", None)
+        if isinstance(kind, str) and kind.lower() == "dark":
+            return "dark"
+    except Exception:
+        pass
+    return "light"
+
+
 # ── Data ──────────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
@@ -28,6 +75,27 @@ def load_data():
     df["season_start"] = split[0].astype(int)
     df["season_end"]   = split[1].astype(int)
     return df
+
+def fuzzy_coach_search(names: tuple[str, ...], term: str, *, limit: int = 20) -> list[str]:
+    """Return coach names ranked by fuzzy match to ``term``; empty query returns all names."""
+    if not names:
+        return []
+    q = term.strip()
+    if not q:
+        return list(names)
+    matches = process.extract(
+        q,
+        names,
+        scorer=fuzz.WRatio,
+        limit=limit,
+    )
+    return [m[0] for m in matches]
+
+
+def _search_coaches(term: str, names: tuple[str, ...]) -> list[str]:
+    """Stable handler for ``st_searchbox`` — ``names`` passed via component kwargs."""
+    return fuzzy_coach_search(names, term, limit=20)
+
 
 def assign_archetypes(df):
     """Compute archetypes relative to the filtered set's medians."""
@@ -79,9 +147,6 @@ min_decisions = st.sidebar.slider(
 season_range = st.sidebar.slider(
     "Season range", min_value=1999, max_value=2025, value=(1999, 2025), step=1
 )
-highlight_input = st.sidebar.text_input(
-    "🔍 Highlight a coach", placeholder="e.g. Dan Campbell"
-)
 
 # ── Filter ────────────────────────────────────────────────────────────────────
 df = all_coaches[all_coaches["total_decisions"] >= min_decisions].copy()
@@ -93,6 +158,34 @@ df = df[
 ]
 
 df = assign_archetypes(df)
+
+# Highlight: fuzzy searchbox (names locked to current filters)
+_coach_names = tuple(sorted(df["coach_name"].dropna().unique()))
+_coach_name_set = set(_coach_names)
+
+with st.sidebar:
+    st.divider()
+    selected_coach = st_searchbox(
+        _search_coaches,
+        names=_coach_names,
+        label="🔍 Highlight a coach",
+        help="Type to fuzzy-match spelling — suggestions update as you type.",
+        placeholder="e.g. Shottenheimer, Campbell…",
+        default=None,
+        default_options=list(_coach_names) if _coach_names else None,
+        clear_on_submit=False,
+        key="coach_highlight_fuzzy",
+    )
+
+highlight_input = (
+    selected_coach
+    if (selected_coach and selected_coach in _coach_name_set)
+    else None
+)
+if selected_coach and selected_coach not in _coach_name_set:
+    st.sidebar.caption(
+        "Selection is outside the current filters — narrow filters or pick a coach from the list."
+    )
 med_go  = df["_med_go"].iloc[0]  if len(df) > 0 else 0.14
 med_dqs = df["_med_dqs"].iloc[0] if len(df) > 0 else 0.0086
 
@@ -113,6 +206,7 @@ col_d.metric("Seasons covered", f"{season_range[0]}–{season_range[1]}")
 st.divider()
 
 # ── Build chart ───────────────────────────────────────────────────────────────
+pal = _CHART_THEME[_chart_theme_key()]
 fig = go.Figure()
 
 # One trace per archetype for clean legend
@@ -126,7 +220,7 @@ for arch, color in ARCH_COLORS.items():
         mode="markers",
         name=arch,
         marker=dict(color=color, size=8, opacity=0.75,
-                    line=dict(color="white", width=0.5)),
+                    line=dict(color=pal["marker_line"], width=0.5)),
         customdata=sub[["coach_name", "seasons", "total_decisions",
                          "odr", "dqs_rank"]].values,
         hovertemplate=(
@@ -140,9 +234,9 @@ for arch, color in ARCH_COLORS.items():
         ),
     ))
 
-# Highlight specific coach
+# Highlight specific coach (exact name from selectbox)
 if highlight_input:
-    match = df[df["coach_name"].str.contains(highlight_input, case=False, na=False)]
+    match = df[df["coach_name"] == highlight_input]
     if not match.empty:
         fig.add_trace(go.Scatter(
             x=match["go_rate"],
@@ -150,24 +244,27 @@ if highlight_input:
             mode="markers+text",
             name=f"★ {highlight_input}",
             marker=dict(color="#C5203B", size=14, symbol="star",
-                        line=dict(color="white", width=1)),
+                        line=dict(color=pal["marker_line"], width=1)),
             text=match["coach_name"],
             textposition="top center",
-            textfont=dict(size=11, color="#C5203B"),
+            textfont=dict(size=11, color=pal["highlight_text"]),
+            hoverinfo="skip",  # star is redundant with label + other traces' hovers
         ))
     else:
-        st.sidebar.warning(f"No match for '{highlight_input}'")
+        st.sidebar.warning(f"No row for '{highlight_input}' with current filters.")
 
 # Median reference lines
 fig.add_hline(
-    y=med_dqs, line_dash="dash", line_color="#B0BEC5", line_width=1.2,
+    y=med_dqs, line_dash="dash", line_color=pal["median_line"], line_width=1.2,
     annotation_text=f"Median DQS ({med_dqs:.4f})",
     annotation_position="right", annotation_font_size=10,
+    annotation_font_color=pal["font_color"],
 )
 fig.add_vline(
-    x=med_go, line_dash="dash", line_color="#B0BEC5", line_width=1.2,
+    x=med_go, line_dash="dash", line_color=pal["median_line"], line_width=1.2,
     annotation_text=f"Median go rate ({med_go:.1%})",
     annotation_position="top right", annotation_font_size=10,
+    annotation_font_color=pal["font_color"],
 )
 
 # Quadrant labels — anchored to fixed axis bounds so they don't drift with filters
@@ -190,23 +287,43 @@ for text, x_side, y_side, color in [
 
 fig.update_layout(
     height=560,
+    font=dict(color=pal["font_color"]),
     xaxis=dict(
-        title="Go-For-It Rate",
+        title=dict(text="Go-For-It Rate", font=dict(color=pal["font_color"])),
         tickformat=".0%",
         range=[X_MIN, X_MAX],   # fixed — never shifts with filters
+        tickfont=dict(color=pal["font_color"]),
+        gridcolor=pal["grid_color"],
+        zerolinecolor=pal["grid_color"],
+        showgrid=True,
     ),
     yaxis=dict(
-        title="DQS — Decision Quality Score (lower = better)",
+        title=dict(
+            text="DQS — Decision Quality Score (lower = better)",
+            font=dict(color=pal["font_color"]),
+        ),
         range=[Y_MAX, Y_MIN],   # reversed: low DQS at top, fixed bounds
+        tickfont=dict(color=pal["font_color"]),
+        gridcolor=pal["grid_color"],
+        zerolinecolor=pal["grid_color"],
+        showgrid=True,
     ),
-    legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
-    plot_bgcolor="#FAFAFA",
-    paper_bgcolor="white",
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.01,
+        xanchor="left",
+        x=0,
+        font=dict(color=pal["font_color"]),
+    ),
+    plot_bgcolor=pal["plot_bgcolor"],
+    paper_bgcolor=pal["paper_bgcolor"],
     margin=dict(l=60, r=40, t=40, b=60),
     hovermode="closest",
 )
 
-st.plotly_chart(fig, use_container_width=True)
+# theme=None: use our layout colors as-is; theme="streamlit" can override plot_bgcolor.
+st.plotly_chart(fig, use_container_width=True, theme=None)
 
 # ── Archetype breakdown ───────────────────────────────────────────────────────
 st.subheader("Archetype Breakdown")
