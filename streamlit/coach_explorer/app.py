@@ -3,6 +3,7 @@ Coach Explorer — NFL 4th Down Decision Analysis
 Interactive scatter plot of all 167 qualifying coaches: aggression vs decision quality.
 """
 
+import sys
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,6 +22,41 @@ st.set_page_config(
 
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+_APP_STREAMLIT_CONFIG = Path(__file__).resolve().parent / ".streamlit" / "config.toml"
+
+
+def _read_theme_base_from_config() -> str | None:
+    """Return ``'light'``, ``'dark'``, or ``None`` from this app's ``config.toml`` ``[theme].base``."""
+    if not _APP_STREAMLIT_CONFIG.is_file():
+        return None
+    try:
+        text = _APP_STREAMLIT_CONFIG.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if sys.version_info >= (3, 11):
+        try:
+            import tomllib
+
+            theme_tbl = tomllib.loads(text).get("theme") or {}
+            b = theme_tbl.get("base")
+            if isinstance(b, str):
+                return b.strip().lower()
+        except Exception:
+            pass
+    # Fallback without tomllib: scan [theme] section for base =
+    in_theme = False
+    for raw in text.splitlines():
+        s = raw.split("#", 1)[0].strip()
+        if s.startswith("[") and s.endswith("]"):
+            in_theme = s.lower() == "[theme]"
+            continue
+        if not in_theme or "=" not in s:
+            continue
+        key, _, val = s.partition("=")
+        if key.strip().lower() == "base":
+            return val.strip().strip('"').strip("'").lower()
+    return None
+
 
 # Plotly colors synced to Streamlit light/dark when `st.context.theme` is available.
 _CHART_THEME = {
@@ -46,12 +82,23 @@ _CHART_THEME = {
 
 
 def _chart_theme_key() -> str:
-    """Return 'dark' or 'light' for chart styling. Uses ``st.context.theme`` (Streamlit >= 1.46)."""
+    """Return ``dark`` or ``light`` for Plotly styling.
+
+    ``st.context.theme.type`` follows the browser/OS color scheme and can report
+    dark even when ``config.toml`` pins a light custom theme (light app, dark
+    chart). If ``[theme].base`` is set in this app's ``.streamlit/config.toml``,
+    that value wins over ``context.theme``.
+    """
+    cfg_base = _read_theme_base_from_config()
+    if cfg_base == "light":
+        return "light"
+    if cfg_base == "dark":
+        return "dark"
+
     try:
         theme = getattr(st.context, "theme", None)
         if theme is None:
             return "light"
-        # 1.46+ exposes .type ("light" | "dark"); may also be a mapping with "type"
         kind = None
         if isinstance(theme, dict):
             kind = theme.get("type")
